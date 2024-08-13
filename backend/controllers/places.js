@@ -1,5 +1,6 @@
 const router = require('express').Router()
 const db = require("../models")
+const jwt = require('json-web-token');
 
 const { Place, Comment, User } = db
 
@@ -33,7 +34,7 @@ router.get('/:placeId', async (req, res) => {
             where: { placeId: placeId },
             include: {
                 association: 'comments',
-                include: 'author'
+                include: 'author',
             }
         })
         if (!place) {
@@ -83,15 +84,36 @@ router.delete('/:placeId', async (req, res) => {
 
 router.post('/:placeId/comments', async (req, res) => {
     const placeId = Number(req.params.placeId)
-
+console.log('placeId', placeId)
     req.body.rant = req.body.rant ? true : false
 
     const place = await Place.findOne({
         where: { placeId: placeId }
     })
-
     if (!place) {
         res.status(404).json({ message: `Could not find place with id "${placeId}"` })
+    }
+
+// NEW
+    let currentUser;
+    try {
+        console.log("headers", req.headers)
+        const [method, token] = req.headers.authorization.split(' ')
+        if (method == 'Bearer') {
+            console.log("jwt ------------> ",process.env.JWT_SECRET)
+            console.log("token", token)
+            const result = await jwt.decode(process.env.JWT_SECRET, token)
+            console.log("result ---------> ", result)
+            const { id } = result.value
+            console.log("id ---> ", id)
+            currentUser = await User.findOne({
+                where: {
+                    userId: id
+                }
+            })
+        }
+    } catch {
+        currentUser = null
     }
 
     const author = await User.findOne({
@@ -102,14 +124,20 @@ router.post('/:placeId/comments', async (req, res) => {
         res.status(404).json({ message: `Could not find author with id "${req.body.authorId}"` })
     }
 
+    // NEW
+    if (!req.currentUser) {
+        return res.status(404).json({ message: `You must be logged in to leave a rant or rave.` })
+    }
+
     const comment = await Comment.create({
         ...req.body,
+        authorId: req.currentUser.userId,
         placeId: placeId
     })
-
+console.log("comment", comment)
     res.send({
         ...comment.toJSON(),
-        author
+        author: req.currentUser
     })
 })
 
@@ -134,5 +162,8 @@ router.delete('/:placeId/comments/:commentId', async (req, res) => {
     }
 })
 
-
 module.exports = router
+
+
+
+

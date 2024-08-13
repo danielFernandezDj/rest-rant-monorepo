@@ -48,16 +48,19 @@ function PlaceDetails() {
 	}
 
 	async function createComment(commentAttributes) {
+		console.log('place', place)
 		const response = await fetch(`http://localhost:5000/places/${place.placeId}/comments`, {
 			method: 'POST',
 			headers: {
+				// NEW
+				'Authorization': `Bearer ${localStorage.getItem('token')}`,
 				'Content-Type': 'application/json'
 			},
 			body: JSON.stringify(commentAttributes)
 		})
 
 		const comment = await response.json()
-
+		
 		setPlace({
 			...place,
 			comments: [
@@ -67,8 +70,6 @@ function PlaceDetails() {
 		})
 
 	}
-
-
 
 	let comments = (
 		<h3 className="inactive">
